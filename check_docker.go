@@ -3,25 +3,16 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
+
+	nagios "source.datanerd.us/site-engineering/go_nagios"
 )
 
 const (
 	API_VERSION = "v1.10"
-)
-
-type NagiosStatusVal int
-
-const (
-	NAGIOS_OK NagiosStatusVal = iota
-	NAGIOS_WARNING
-	NAGIOS_CRITICAL
-	NAGIOS_UNKNOWN
 )
 
 type CliOpt struct {
@@ -41,63 +32,11 @@ type DockerInfo struct {
 	MetaSpaceTotal float64
 }
 
-type NagiosStatus struct {
-	Message string
-	Value NagiosStatusVal
-}
-
-func (status *NagiosStatus) Aggregate(otherStatuses []*NagiosStatus) {
-	for _, s := range(otherStatuses) {
-		if status.Value < s.Value {
-			status.Value = s.Value
-		}
-
-		status.Message += " - " + s.Message
-	}
-}
-
 type HttpResponseFetcher interface {
 	Fetch(url string) ([]byte, error)
 }
 
 type Fetcher struct{}
-
-func Unknown(output string) {
-	fmt.Fprint(os.Stdout, "UNKNOWN:", output)
-	os.Exit(3)
-}
-
-func Critical(err error) {
-	fmt.Fprint(os.Stdout, "CRITICAL:", err.Error())
-	os.Exit(2)
-}
-
-func Warning(output string) {
-	fmt.Fprint(os.Stdout, "WARNING:", output)
-	os.Exit(1)
-}
-
-func Ok(output string) {
-	fmt.Fprint(os.Stdout, "OK:", output)
-	os.Exit(0)
-}
-
-func ExitWithNagiosStatus(status *NagiosStatus) {
-	switch {
-		case status.Value == NAGIOS_UNKNOWN:
-			println("UNKNOWN:", status.Message)
-			os.Exit(3)
-		case status.Value == NAGIOS_CRITICAL:
-			println("CRITICAL:", status.Message)
-			os.Exit(2)
-		case status.Value == NAGIOS_WARNING:
-			println("WARNING:", status.Message)
-			os.Exit(1)
-		case status.Value == NAGIOS_OK:
-			println("OK:", status.Message)
-			os.Exit(0)
-	}
-}
 
 func float64String(num float64) string {
 	return strconv.FormatFloat(num, 'f', 0, 64)
@@ -180,28 +119,28 @@ func fetchInfo(fetcher Fetcher, opts CliOpt, info *DockerInfo) error {
 	return nil
 }
 
-func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*NagiosStatus {
-	var statuses []*NagiosStatus
+func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
+	var statuses []*nagios.NagiosStatus
 
 	type checkArgs struct {
 		tag string
 		value float64
 		comparison float64
-		statusVal NagiosStatusVal
+		statusVal nagios.NagiosStatusVal
 	}
 
-	var check = func(args checkArgs) *NagiosStatus {
+	var check = func(args checkArgs) *nagios.NagiosStatus {
 		if args.value > args.comparison {
-			return &NagiosStatus{args.tag + ": " + float64String(args.value), args.statusVal}
+			return &nagios.NagiosStatus{args.tag + ": " + float64String(args.value), args.statusVal}
 		}
 		return nil
 	}
 
 	checks := []checkArgs{
-		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.CritMetaSpace), NAGIOS_CRITICAL},
-		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.CritDataSpace), NAGIOS_CRITICAL},
-		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.WarnMetaSpace), NAGIOS_WARNING},
-		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.WarnDataSpace), NAGIOS_WARNING},
+		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.CritMetaSpace), nagios.NAGIOS_CRITICAL},
+		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.CritDataSpace), nagios.NAGIOS_CRITICAL},
+		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.WarnMetaSpace), nagios.NAGIOS_WARNING},
+		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.WarnDataSpace), nagios.NAGIOS_WARNING},
 	}
 
 	for _, entry := range(checks) {
@@ -228,12 +167,12 @@ func main() {
 
 	err := fetchInfo(fetcher, opts, &info)
 	if err != nil {
-		Critical(err)
+		nagios.Critical(err)
 	}
 
 	statuses := mapAlertStatuses(&info, &opts)
-	status   := NagiosStatus{float64String(info.Containers) + " containers", 0}
+	status   := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
 
 	status.Aggregate(statuses)
-	ExitWithNagiosStatus(&status)
+	nagios.ExitWithNagiosStatus(&status)
 }
