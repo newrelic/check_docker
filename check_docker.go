@@ -137,10 +137,26 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 	}
 
 	checks := []checkArgs{
-		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.CritMetaSpace), nagios.NAGIOS_CRITICAL},
-		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.CritDataSpace), nagios.NAGIOS_CRITICAL},
-		checkArgs{"Meta Space Used", info.MetaSpaceUsed / info.MetaSpaceTotal * 100, float64(opts.WarnMetaSpace), nagios.NAGIOS_WARNING},
-		checkArgs{"Data Space Used", info.DataSpaceUsed / info.DataSpaceTotal * 100, float64(opts.WarnDataSpace), nagios.NAGIOS_WARNING},
+		checkArgs{"Meta Space Used",
+			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
+			float64(opts.CritMetaSpace),
+			nagios.NAGIOS_CRITICAL,
+		},
+		checkArgs{"Data Space Used",
+			info.DataSpaceUsed / info.DataSpaceTotal * 100,
+			float64(opts.CritDataSpace),
+			nagios.NAGIOS_CRITICAL,
+		},
+		checkArgs{"Meta Space Used",
+			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
+			float64(opts.WarnMetaSpace),
+			nagios.NAGIOS_WARNING,
+		},
+		checkArgs{"Data Space Used",
+			info.DataSpaceUsed / info.DataSpaceTotal * 100,
+			float64(opts.WarnDataSpace),
+			nagios.NAGIOS_WARNING,
+		},
 	}
 
 	for _, entry := range(checks) {
@@ -174,5 +190,5 @@ func main() {
 	status   := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
 
 	status.Aggregate(statuses)
-	nagios.ExitWithNagiosStatus(&status)
+	nagios.ExitWithStatus(&status)
 }
