@@ -154,6 +154,16 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 			float64(opts.CritDataSpace),
 			nagios.NAGIOS_CRITICAL,
 		},
+		checkArgs{"Meta Space Used",
+		        info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
+		        float64(opts.WarnMetaSpace),
+		        nagios.NAGIOS_WARNING,
+		},
+		checkArgs{"Data Space Used",
+		        info.DataSpaceUsed / info.DataSpaceTotal * 100,
+		        float64(opts.WarnDataSpace),
+		        nagios.NAGIOS_WARNING,
+		},
 	}
 
 	for _, entry := range(checks) {
