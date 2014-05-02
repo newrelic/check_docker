@@ -15,6 +15,7 @@ const (
 	API_VERSION = "v1.10"
 )
 
+// A struct representing CLI opts that will be passed at runtime
 type CliOpt struct {
 	BaseUrl string
 	CritDataSpace int
@@ -23,6 +24,7 @@ type CliOpt struct {
 	WarnMetaSpace int
 }
 
+// Information describing the status of a Docker host
 type DockerInfo struct {
 	Containers     float64
 	DriverStatus   [][]string
@@ -38,10 +40,12 @@ type HttpResponseFetcher interface {
 
 type Fetcher struct{}
 
+// Properly format a Float64 as a string
 func float64String(num float64) string {
 	return strconv.FormatFloat(num, 'f', 0, 64)
 }
 
+// Return a float from a Docker info string for megabytes
 func megabytesFloat64(value string) (float64, error) {
 	numberStr   := strings.Fields(value)[0]
 	number, err := strconv.ParseFloat(numberStr, 64)
@@ -82,6 +86,7 @@ func (Fetcher) Fetch(url string) ([]byte, error) {
 	return contents, nil
 }
 
+// Parses JSON and populates a DockerInfo
 func populateInfo(contents []byte, info *DockerInfo) error {
 	err := json.Unmarshal(contents, &info)
 	if err != nil {
@@ -105,6 +110,7 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 	return nil
 }
 
+// Retrieves JSON from a Docker host and fills in a DockerInfo
 func fetchInfo(fetcher Fetcher, opts CliOpt, info *DockerInfo) error {
 	contents, err := fetcher.Fetch(opts.BaseUrl)
 	if err != nil {
@@ -119,6 +125,7 @@ func fetchInfo(fetcher Fetcher, opts CliOpt, info *DockerInfo) error {
 	return nil
 }
 
+// Runs a set of checkes and returns an array of statuses
 func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 	var statuses []*nagios.NagiosStatus
 
@@ -146,16 +153,6 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 			info.DataSpaceUsed / info.DataSpaceTotal * 100,
 			float64(opts.CritDataSpace),
 			nagios.NAGIOS_CRITICAL,
-		},
-		checkArgs{"Meta Space Used",
-			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
-			float64(opts.WarnMetaSpace),
-			nagios.NAGIOS_WARNING,
-		},
-		checkArgs{"Data Space Used",
-			info.DataSpaceUsed / info.DataSpaceTotal * 100,
-			float64(opts.WarnDataSpace),
-			nagios.NAGIOS_WARNING,
 		},
 	}
 
