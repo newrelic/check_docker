@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+	nagios "source.datanerd.us/site-engineering/go_nagios"
 )
 
 var jsonFromApi []byte = []byte(
@@ -84,4 +86,43 @@ func TestFetchInfo(t *testing.T) {
 		So(err, ShouldBeNil)
 		So(info.DataSpaceUsed, ShouldEqual, 20.0)
 	})
+}
+
+func TestMapAlertStatuses(t *testing.T) {
+	opts := CliOpts{
+		CritMetaSpace: 6.0,
+		WarnDataSpace: 5.0,
+	}
+
+	Convey("When handed a DockerInfo, returns a list of check results", t, func() {
+		var info DockerInfo
+		populateInfo(jsonFromApi, &info)
+		results := mapAlertStatuses(&info, &opts)
+
+		So(results[0], ShouldHaveTheSameNagiosStatusAs, &nagios.NagiosStatus{"Meta Space Used: 8%", nagios.NAGIOS_CRITICAL})
+		So(results[2], ShouldHaveTheSameNagiosStatusAs, &nagios.NagiosStatus{"Meta Space Used: 8%", nagios.NAGIOS_WARNING})
+	})
+
+	Convey("Produces output that can properly be aggregated by Nagios", t, func() {
+		var info DockerInfo
+		populateInfo(jsonFromApi, &info)
+		results := mapAlertStatuses(&info, &opts)
+
+		status := &nagios.NagiosStatus{"Chaucer", nagios.NAGIOS_UNKNOWN}
+		status.Aggregate(results)
+		expected := &nagios.NagiosStatus{"Chaucer - Meta Space Used: 8% - Data Space Used: 2% - Meta Space Used: 8%", nagios.NAGIOS_UNKNOWN}
+
+		So(status, ShouldHaveTheSameNagiosStatusAs, expected)
+	})
+}
+
+func ShouldHaveTheSameNagiosStatusAs(actual interface{}, expected ...interface{}) string {
+	wanted := expected[0].(*nagios.NagiosStatus)
+	got    := actual.(*nagios.NagiosStatus)
+
+	if got.Value != wanted.Value || got.Message != wanted.Message {
+		return "expected:\n" + fmt.Sprintf("%#v", wanted) + "\n\ngot:\n" + fmt.Sprintf("%#v", got)
+	}
+
+	return ""
 }
