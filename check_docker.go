@@ -116,7 +116,7 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 }
 
 // Retrieves JSON from a Docker host and fills in a DockerInfo
-func fetchInfo(fetcher Fetcher, opts CliOpts, info *DockerInfo) error {
+func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) error {
 	contents, err := fetcher.Fetch(opts.BaseUrl)
 	if err != nil {
 		return err
