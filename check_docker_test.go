@@ -39,3 +39,31 @@ func TestFindDriverStatus(t *testing.T) {
 		So(findDriverStatus("KeyFoo", driverStatuses), ShouldEqual, "")
 	})
 }
+
+func TestPopulateDriverInfo(t *testing.T) {
+	jsonFromApi := []byte(
+		`{
+			"DriverStatus": [
+				["Data Space Used", "20.0 mb"],
+				["Data Space Total", "1000.0 mb"],
+				["Metadata Space Used", "15.0 mb"],
+				["Metadata Space Total", "200.0 mb"]
+			]
+		}`,
+	)
+
+	Convey("Correctly parses the JSON and populates the DockerInfo", t, func() {
+		var info DockerInfo
+		err := populateInfo(jsonFromApi, &info)
+
+		So(err, ShouldBeNil)
+		So(info.DataSpaceUsed, ShouldEqual, 20.0)
+	})
+
+	Convey("Returns an intelligent error when the key is not found", t, func() {
+		var info DockerInfo
+		err := populateInfo([]byte(`{}`), &info)
+
+		So(err.Error(), ShouldContainSubstring, "Can't find key: Data Space Used")
+	})
+}

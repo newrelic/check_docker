@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"flag"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -16,7 +17,7 @@ const (
 )
 
 // A struct representing CLI opts that will be passed at runtime
-type CliOpt struct {
+type CliOpts struct {
 	BaseUrl string
 	CritDataSpace int
 	WarnDataSpace int
@@ -88,7 +89,7 @@ func (Fetcher) Fetch(url string) ([]byte, error) {
 
 // Parses JSON and populates a DockerInfo
 func populateInfo(contents []byte, info *DockerInfo) error {
-	err := json.Unmarshal(contents, &info)
+	err := json.Unmarshal(contents, info)
 	if err != nil {
 		return err
 	}
@@ -101,17 +102,21 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 	}
 
 	for key, val := range(fields) {
-	  *val, err = megabytesFloat64(findDriverStatus(key, info.DriverStatus))
-	  if err != nil {
-		return errors.New("Error parsing response from API! " + err.Error())
-	  }
+		entry := findDriverStatus(key, info.DriverStatus)
+		if entry == "" {
+			return errors.New("Error parsing response from API! Can't find key: " + key)
+		}
+		*val, err = megabytesFloat64(findDriverStatus(key, info.DriverStatus))
+		if err != nil {
+			return errors.New("Error parsing response from API! " + err.Error())
+		}
 	}
 
 	return nil
 }
 
 // Retrieves JSON from a Docker host and fills in a DockerInfo
-func fetchInfo(fetcher Fetcher, opts CliOpt, info *DockerInfo) error {
+func fetchInfo(fetcher Fetcher, opts CliOpts, info *DockerInfo) error {
 	contents, err := fetcher.Fetch(opts.BaseUrl)
 	if err != nil {
 		return err
@@ -126,7 +131,7 @@ func fetchInfo(fetcher Fetcher, opts CliOpt, info *DockerInfo) error {
 }
 
 // Runs a set of checkes and returns an array of statuses
-func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
+func mapAlertStatuses(info *DockerInfo, opts *CliOpts) []*nagios.NagiosStatus {
 	var statuses []*nagios.NagiosStatus
 
 	type checkArgs struct {
@@ -155,14 +160,14 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 			nagios.NAGIOS_CRITICAL,
 		},
 		checkArgs{"Meta Space Used",
-		        info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
-		        float64(opts.WarnMetaSpace),
-		        nagios.NAGIOS_WARNING,
+			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
+			float64(opts.WarnMetaSpace),
+			nagios.NAGIOS_WARNING,
 		},
 		checkArgs{"Data Space Used",
-		        info.DataSpaceUsed / info.DataSpaceTotal * 100,
-		        float64(opts.WarnDataSpace),
-		        nagios.NAGIOS_WARNING,
+			info.DataSpaceUsed / info.DataSpaceTotal * 100,
+			float64(opts.WarnDataSpace),
+			nagios.NAGIOS_WARNING,
 		},
 	}
 
@@ -176,26 +181,34 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpt) []*nagios.NagiosStatus {
 	return statuses
 }
 
+func parseCommandLine() *CliOpts {
+	var opts CliOpts
+
+	flag.StringVar(&opts.BaseUrl,    "base-url", "http://chi-staging-pool-1:4243/", "The Base URL for the Docker server")
+	flag.IntVar(&opts.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
+	flag.IntVar(&opts.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
+	flag.IntVar(&opts.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
+	flag.IntVar(&opts.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
+
+	flag.Parse()
+
+	return &opts
+}
+
 func main() {
-	opts := CliOpt{
-		BaseUrl:      "http://chi-staging-pool-1:4243/",
-		WarnMetaSpace: 0,
-		WarnDataSpace: 0,
-		CritMetaSpace: 66,
-		CritDataSpace: 66,
-	}
+	opts := parseCommandLine()
 
 	var fetcher Fetcher
 	var info DockerInfo
 
-	err := fetchInfo(fetcher, opts, &info)
+	err := fetchInfo(fetcher, *opts, &info)
 	if err != nil {
 		nagios.Critical(err)
 	}
 
-	statuses := mapAlertStatuses(&info, &opts)
-	status   := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
+	statuses   := mapAlertStatuses(&info, opts)
+	baseStatus := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
 
-	status.Aggregate(statuses)
-	nagios.ExitWithStatus(&status)
+	baseStatus.Aggregate(statuses)
+	nagios.ExitWithStatus(&baseStatus)
 }
