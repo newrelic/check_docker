@@ -6,6 +6,24 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var jsonFromApi []byte = []byte(
+	`{
+		"DriverStatus": [
+			["Data Space Used", "20.0 mb"],
+			["Data Space Total", "1000.0 mb"],
+			["Metadata Space Used", "15.0 mb"],
+			["Metadata Space Total", "200.0 mb"]
+		]
+	}`,
+)
+
+
+type stubFetcher struct{}
+
+func (fetcher stubFetcher) Fetch(url string) ([]byte, error) {
+	return jsonFromApi, nil
+}
+
 func TestFloat64String(t *testing.T) {
 	Convey("Converts a float to a formatted string with no decimals", t, func() {
 		So(float64String(1.2), ShouldEqual, "1")
@@ -41,17 +59,6 @@ func TestFindDriverStatus(t *testing.T) {
 }
 
 func TestPopulateDriverInfo(t *testing.T) {
-	jsonFromApi := []byte(
-		`{
-			"DriverStatus": [
-				["Data Space Used", "20.0 mb"],
-				["Data Space Total", "1000.0 mb"],
-				["Metadata Space Used", "15.0 mb"],
-				["Metadata Space Total", "200.0 mb"]
-			]
-		}`,
-	)
-
 	Convey("Correctly parses the JSON and populates the DockerInfo", t, func() {
 		var info DockerInfo
 		err := populateInfo(jsonFromApi, &info)
@@ -65,5 +72,16 @@ func TestPopulateDriverInfo(t *testing.T) {
 		err := populateInfo([]byte(`{}`), &info)
 
 		So(err.Error(), ShouldContainSubstring, "Can't find key: Data Space Used")
+	})
+}
+
+func TestFetchInfo(t *testing.T) {
+	Convey("Can fetch info using a Fetcher and populate a DockerInfo", t, func() {
+		var info DockerInfo
+		var stub stubFetcher
+		err := fetchInfo(stub, CliOpts{}, &info)
+
+		So(err, ShouldBeNil)
+		So(info.DataSpaceUsed, ShouldEqual, 20.0)
 	})
 }
