@@ -143,7 +143,7 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpts) []*nagios.NagiosStatus {
 
 	var check = func(args checkArgs) *nagios.NagiosStatus {
 		if args.value > args.comparison {
-			return &nagios.NagiosStatus{args.tag + ": " + float64String(args.value), args.statusVal}
+			return &nagios.NagiosStatus{args.tag + ": " + float64String(args.value) + "%", args.statusVal}
 		}
 		return nil
 	}
