@@ -39,8 +39,8 @@ func TestMegabytesFloat64(t *testing.T) {
 	})
 
 	Convey("Returns an error when not parseable", t, func() {
-		_, err := megabytesFloat64("1024.05 Mb")
-		So(err, ShouldBeNil)
+		_, err := megabytesFloat64("1024.05mb")
+		So(err.Error(), ShouldContainSubstring, "invalid syntax")
 	})
 }
 
