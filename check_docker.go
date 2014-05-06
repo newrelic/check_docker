@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	nagios "source.datanerd.us/site-engineering/go_nagios"
+	"source.datanerd.us/site-engineering/go_nagios"
 )
 
 const (

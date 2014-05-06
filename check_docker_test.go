@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	nagios "source.datanerd.us/site-engineering/go_nagios"
+	"source.datanerd.us/site-engineering/go_nagios"
 )
 
 var jsonFromApi []byte = []byte(
