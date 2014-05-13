@@ -8,7 +8,7 @@ import (
 	"source.datanerd.us/site-engineering/go_nagios"
 )
 
-var jsonFromApi []byte = []byte(
+var infoJsonFromApi []byte = []byte(
 	`{
 		"DriverStatus": [
 			["Data Space Used", "20.0 mb"],
@@ -19,11 +19,51 @@ var jsonFromApi []byte = []byte(
 	}`,
 )
 
+var containersJsonFromApi []byte = []byte(
+	`[
+	  {
+	    "Command": "script/run ",
+	    "Created": 1399681210,
+	    "Id": "ded464bf7dfb978b6b101c289a06b59a1c64435b3b7e70c97e6876ceb2a9a159",
+	    "Image": "testing:b969c9317cc60c389162cbdb2999806ef9b9666b",
+	    "Names": [
+	      "/insane_franklin"
+	    ],
+	    "Ports": [
+	      {
+	        "IP": "0.0.0.0",
+	        "PrivatePort": 80,
+	        "PublicPort": 8485,
+	        "Type": "tcp"
+	      }
+	    ],
+	    "Status": "Up 3 days"
+	  },
+	  {
+	    "Command": "script/run ",
+	    "Created": 1399681124,
+	    "Id": "a64bba6cd0dbfb9b1bc1880f38d138a1c69a929853dcfca72314d1242e00017c",
+	    "Image": "real:b969c9317cc60c389162cbdb2999806ef9b9666b",
+	    "Names": [
+	      "/sad_ptolemy"
+	    ],
+	    "Ports": [
+	      {
+	        "IP": "0.0.0.0",
+	        "PrivatePort": 80,
+	        "PublicPort": 80,
+	        "Type": "tcp"
+	      }
+	    ],
+	    "Status": "Exit 0"
+	  }
+	]`,
+)
 
 type stubFetcher struct{}
 
 func (fetcher stubFetcher) Fetch(url string) ([]byte, error) {
-	return jsonFromApi, nil
+	return infoJsonFromApi, nil
 }
 
 func TestFloat64String(t *testing.T) {
@@ -63,7 +103,7 @@ func TestFindDriverStatus(t *testing.T) {
 func TestPopulateDriverInfo(t *testing.T) {
 	Convey("Correctly parses the JSON and populates the DockerInfo", t, func() {
 		var info DockerInfo
-		err := populateInfo(jsonFromApi, &info)
+		err := populateInfo(infoJsonFromApi, &info)
 
 		So(err, ShouldBeNil)
 		So(info.DataSpaceUsed, ShouldEqual, 20.0)
@@ -74,6 +114,29 @@ func TestPopulateDriverInfo(t *testing.T) {
 		err := populateInfo([]byte(`{}`), &info)
 
 		So(err.Error(), ShouldContainSubstring, "Can't find key: Data Space Used")
+	})
+}
+
+func TestCheckRunningImages(t *testing.T) {
+	Convey("Searches a JSON blob to find an image with a specified tag", t, func() {
+		running, err := checkRunningImage(containersJsonFromApi, &CliOpts{ImageId: "testing"})
+
+		So(err, ShouldBeNil)
+		So(running, ShouldBeTrue)
+	})
+
+	Convey("Correctly identifies when the tag is missing", t, func() {
+		running, err := checkRunningImage(containersJsonFromApi, &CliOpts{ImageId: "Shakespeare"})
+
+		So(err, ShouldBeNil)
+		So(running, ShouldBeFalse)
+	})
+
+	Convey("Bubbles up errors from the Json library", t, func() {
+		running, err := checkRunningImage([]byte("-"), &CliOpts{ImageId: "Shakespeare"})
+
+		So(err, ShouldNotBeNil)
+		So(running, ShouldBeFalse)
 	})
 }
 
@@ -96,7 +159,7 @@ func TestMapAlertStatuses(t *testing.T) {
 
 	Convey("When handed a DockerInfo, returns a list of check results", t, func() {
 		var info DockerInfo
-		populateInfo(jsonFromApi, &info)
+		populateInfo(infoJsonFromApi, &info)
 		results := mapAlertStatuses(&info, &opts)
 
 		So(results[0], ShouldHaveTheSameNagiosStatusAs, &nagios.NagiosStatus{"Meta Space Used: 8%", nagios.NAGIOS_CRITICAL})
@@ -105,7 +168,7 @@ func TestMapAlertStatuses(t *testing.T) {
 
 	Convey("Produces output that can properly be aggregated by Nagios", t, func() {
 		var info DockerInfo
-		populateInfo(jsonFromApi, &info)
+		populateInfo(infoJsonFromApi, &info)
 		results := mapAlertStatuses(&info, &opts)
 
 		status := &nagios.NagiosStatus{"Chaucer", nagios.NAGIOS_UNKNOWN}

@@ -23,6 +23,7 @@ type CliOpts struct {
 	WarnDataSpace int
 	CritMetaSpace int
 	WarnMetaSpace int
+	ImageId string
 }
 
 // Information describing the status of a Docker host
@@ -33,6 +34,22 @@ type DockerInfo struct {
 	DataSpaceTotal float64
 	MetaSpaceUsed  float64
 	MetaSpaceTotal float64
+	ImageIsRunning bool
+}
+
+type checkArgs struct {
+	tag string
+	value string
+	healthy bool
+	appendErrorMessage string
+	statusVal nagios.NagiosStatusVal
+}
+
+
+// Describes one container
+type Container struct {
+	Image		string
+	Status		string
 }
 
 type HttpResponseFetcher interface {
@@ -71,7 +88,7 @@ func findDriverStatus(key string, driverStatus [][]string) string {
 
 // Connect to a Docker URL and return the contents as a []byte
 func (Fetcher) Fetch(url string) ([]byte, error) {
-	response, err := http.Get(url + "/" + API_VERSION + "/info")
+	response, err := http.Get(url)
 
 	if err != nil {
 		return nil, err
@@ -115,9 +132,28 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 	return nil
 }
 
-// Retrieves JSON from a Docker host and fills in a DockerInfo
+// checkRunningImage looks to see if a container is currently running from a given
+// Image Id.
+func checkRunningImage(contents []byte, opts *CliOpts) (bool, error) {
+	var containers []Container
+
+	err := json.Unmarshal(contents, &containers)
+	if err != nil {
+		return false, err
+	}
+
+	isRunning := false
+	for _, container := range containers {
+		if strings.HasPrefix(container.Image, opts.ImageId + ":") && strings.HasPrefix(container.Status, "Up") {
+			isRunning = true
+		}
+	}
+	return isRunning, nil
+}
+
+// fetchInfo retrieves JSON from a Docker host and fills in a DockerInfo
 func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) error {
-	contents, err := fetcher.Fetch(opts.BaseUrl)
+	contents, err := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
 	if err != nil {
 		return err
 	}
@@ -127,49 +163,77 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 		return err
 	}
 
+	if opts.ImageId == "" {
+		return nil
+	}
+
+	contents, err = fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/containers/json")
+
+	found, err := checkRunningImage(contents, &opts)
+	if err != nil {
+		return err
+	}
+
+	info.ImageIsRunning = found
+
 	return nil
+}
+
+// defineChecks returns a list of checks we should run based on CLI flags
+func defineChecks(info *DockerInfo, opts *CliOpts) []checkArgs {
+	checks := []checkArgs{
+		checkArgs{"Meta Space Used",
+			float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
+			info.MetaSpaceUsed / info.MetaSpaceTotal * 100 < float64(opts.CritMetaSpace),
+			"%",
+			nagios.NAGIOS_CRITICAL,
+		},
+		checkArgs{"Data Space Used",
+			float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
+			info.DataSpaceUsed / info.DataSpaceTotal * 100 < float64(opts.CritDataSpace),
+			"%",
+			nagios.NAGIOS_CRITICAL,
+		},
+		checkArgs{"Meta Space Used",
+			float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
+			info.MetaSpaceUsed / info.MetaSpaceTotal * 100 < float64(opts.WarnMetaSpace),
+			"%",
+			nagios.NAGIOS_WARNING,
+		},
+		checkArgs{"Data Space Used",
+			float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
+			info.DataSpaceUsed / info.DataSpaceTotal * 100 < float64(opts.WarnDataSpace),
+			"%",
+			nagios.NAGIOS_WARNING,
+		},
+	}
+
+	if opts.ImageId != "" {
+		checks = append(checks,
+			checkArgs{"Running Image",
+				opts.ImageId,
+				info.ImageIsRunning,
+				" is not running!",
+				nagios.NAGIOS_CRITICAL,
+			},
+		)
+	}
+
+	return checks
 }
 
 // Runs a set of checkes and returns an array of statuses
 func mapAlertStatuses(info *DockerInfo, opts *CliOpts) []*nagios.NagiosStatus {
 	var statuses []*nagios.NagiosStatus
 
-	type checkArgs struct {
-		tag string
-		value float64
-		comparison float64
-		statusVal nagios.NagiosStatusVal
-	}
-
 	var check = func(args checkArgs) *nagios.NagiosStatus {
-		if args.value > args.comparison {
-			return &nagios.NagiosStatus{args.tag + ": " + float64String(args.value) + "%", args.statusVal}
+		if !args.healthy {
+			return &nagios.NagiosStatus{args.tag + ": " + args.value + args.appendErrorMessage, args.statusVal}
 		}
 		return nil
 	}
 
-	checks := []checkArgs{
-		checkArgs{"Meta Space Used",
-			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
-			float64(opts.CritMetaSpace),
-			nagios.NAGIOS_CRITICAL,
-		},
-		checkArgs{"Data Space Used",
-			info.DataSpaceUsed / info.DataSpaceTotal * 100,
-			float64(opts.CritDataSpace),
-			nagios.NAGIOS_CRITICAL,
-		},
-		checkArgs{"Meta Space Used",
-			info.MetaSpaceUsed / info.MetaSpaceTotal * 100,
-			float64(opts.WarnMetaSpace),
-			nagios.NAGIOS_WARNING,
-		},
-		checkArgs{"Data Space Used",
-			info.DataSpaceUsed / info.DataSpaceTotal * 100,
-			float64(opts.WarnDataSpace),
-			nagios.NAGIOS_WARNING,
-		},
-	}
+	checks := defineChecks(info, opts)
 
 	for _, entry := range(checks) {
 		result := check(entry)
@@ -189,6 +253,7 @@ func parseCommandLine() *CliOpts {
 	flag.IntVar(&opts.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.IntVar(&opts.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.IntVar(&opts.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
+	flag.StringVar(&opts.ImageId,    "image-id",         "", "An image Id that must be running on the Docker server")
 
 	flag.Parse()
 
