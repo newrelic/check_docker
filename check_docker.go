@@ -253,7 +253,7 @@ func parseCommandLine() *CliOpts {
 	flag.IntVar(&opts.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.IntVar(&opts.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.IntVar(&opts.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
-	flag.StringVar(&opts.ImageId,    "image-id",         "", "An image Id that must be running on the Docker server")
+	flag.StringVar(&opts.ImageId,    "image-id",         "", "An image ID that must be running on the Docker server")
 
 	flag.Parse()
 
