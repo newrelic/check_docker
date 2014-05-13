@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"source.datanerd.us/site-engineering/go_nagios"
 )
@@ -35,6 +36,7 @@ type DockerInfo struct {
 	MetaSpaceUsed  float64
 	MetaSpaceTotal float64
 	ImageIsRunning bool
+	GhostCount     int
 }
 
 // Used internally to build lists of checks to run
@@ -154,28 +156,35 @@ func checkRunningImage(contents []byte, opts *CliOpts) (bool, error) {
 
 // fetchInfo retrieves JSON from a Docker host and fills in a DockerInfo
 func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) error {
-	contents, err := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
-	if err != nil {
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	var err, err2 error
+	var ImageFound bool
+
+	go func() {
+		infoResult, err := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
+		if err == nil {
+			err = populateInfo(infoResult, info)
+		}
+		wg.Done()
+	}()
+
+	go func() {
+		containersResult, err2 := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/containers/json")
+		if err2 == nil {
+			ImageFound, err2 = checkRunningImage(containersResult, &opts)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+
+	if err != nil || err2 != nil {
 		return err
 	}
 
-	err = populateInfo(contents, info)
-	if err != nil {
-		return err
-	}
-
-	if opts.ImageId == "" {
-		return nil
-	}
-
-	contents, err = fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/containers/json")
-
-	found, err := checkRunningImage(contents, &opts)
-	if err != nil {
-		return err
-	}
-
-	info.ImageIsRunning = found
+	info.ImageIsRunning = ImageFound
 
 	return nil
 }
