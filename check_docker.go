@@ -37,6 +37,7 @@ type DockerInfo struct {
 	ImageIsRunning bool
 }
 
+// Used internally to build lists of checks to run
 type checkArgs struct {
 	tag string
 	value string
@@ -45,13 +46,13 @@ type checkArgs struct {
 	statusVal nagios.NagiosStatusVal
 }
 
-
 // Describes one container
 type Container struct {
 	Image		string
 	Status		string
 }
 
+// An interface to request things from the Web
 type HttpResponseFetcher interface {
 	Fetch(url string) ([]byte, error)
 }
@@ -245,6 +246,7 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpts) []*nagios.NagiosStatus {
 	return statuses
 }
 
+// parseCommandLine parses the flags passed on the CLI
 func parseCommandLine() *CliOpts {
 	var opts CliOpts
 
