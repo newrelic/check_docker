@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -63,7 +65,15 @@ var containersJsonFromApi []byte = []byte(
 type stubFetcher struct{}
 
 func (fetcher stubFetcher) Fetch(url string) ([]byte, error) {
-	return infoJsonFromApi, nil
+	if strings.Contains(url, "/info") {
+		return infoJsonFromApi, nil
+	}
+
+	if strings.Contains(url, "/containers") {
+		return containersJsonFromApi, nil
+	}
+
+	return nil, errors.New("Don't recognize URL: " + url)
 }
 
 func TestFloat64String(t *testing.T) {
@@ -148,6 +158,15 @@ func TestFetchInfo(t *testing.T) {
 
 		So(err, ShouldBeNil)
 		So(info.DataSpaceUsed, ShouldEqual, 20.0)
+	})
+
+	Convey("Populates the ImageIsRunning field when told to by CLI flags", t, func() {
+		var info DockerInfo
+		var stub stubFetcher
+		err := fetchInfo(stub, CliOpts{ImageId: "testing"}, &info)
+
+		So(err, ShouldBeNil)
+		So(info.ImageIsRunning, ShouldBeTrue)
 	})
 }
 
