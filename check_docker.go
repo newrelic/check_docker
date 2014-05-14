@@ -167,6 +167,7 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 	var imageFound bool
 	var ghostCount int
 
+	// `info` is handled by this goroutine but not the other
 	go func() {
 		var infoResult []byte
 		infoResult, err = fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
