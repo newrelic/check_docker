@@ -187,8 +187,12 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 
 	wg.Wait()
 
-	if err != nil || err2 != nil {
+	if err != nil {
 		return err
+	}
+
+	if err2 != nil {
+		return err2
 	}
 
 	info.ImageIsRunning = imageFound
