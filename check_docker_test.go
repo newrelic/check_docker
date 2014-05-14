@@ -58,6 +58,24 @@ var containersJsonFromApi []byte = []byte(
 	      }
 	    ],
 	    "Status": "Exit 0"
+	  },
+	  {
+	    "Command": "script/run ",
+	    "Created": 1399681124,
+	    "Id": "2938378cd0dbfb9b1bc1880f38d138a1c69a929853dcfca72314d1242e00017c",
+	    "Image": "busted:b969c9317cc60c389162cbdb2999806ef9b9666b",
+	    "Names": [
+	      "/happy_galileo"
+	    ],
+	    "Ports": [
+	      {
+	        "IP": "0.0.0.0",
+	        "PrivatePort": 80,
+	        "PublicPort": 8999,
+	        "Type": "tcp"
+	      }
+	    ],
+	    "Status": "Ghost"
 	  }
 	]`,
 )
@@ -127,26 +145,33 @@ func TestPopulateDriverInfo(t *testing.T) {
 	})
 }
 
-func TestCheckRunningImages(t *testing.T) {
+func TestCheckRunningContainers(t *testing.T) {
 	Convey("Searches a JSON blob to find an image with a specified tag", t, func() {
-		running, err := checkRunningImage(containersJsonFromApi, &CliOpts{ImageId: "testing"})
+		running, _, err := checkRunningContainers(containersJsonFromApi, &CliOpts{ImageId: "testing"})
 
 		So(err, ShouldBeNil)
 		So(running, ShouldBeTrue)
 	})
 
 	Convey("Correctly identifies when the tag is missing", t, func() {
-		running, err := checkRunningImage(containersJsonFromApi, &CliOpts{ImageId: "Shakespeare"})
+		running, _, err := checkRunningContainers(containersJsonFromApi, &CliOpts{ImageId: "Shakespeare"})
 
 		So(err, ShouldBeNil)
 		So(running, ShouldBeFalse)
 	})
 
 	Convey("Bubbles up errors from the Json library", t, func() {
-		running, err := checkRunningImage([]byte("-"), &CliOpts{ImageId: "Shakespeare"})
+		running, _, err := checkRunningContainers([]byte("-"), &CliOpts{ImageId: "Shakespeare"})
 
 		So(err, ShouldNotBeNil)
 		So(running, ShouldBeFalse)
+	})
+
+	Convey("Identifies ghost containers", t, func() {
+		_, ghosts, err := checkRunningContainers(containersJsonFromApi, &CliOpts{ImageId: "Shakespeare"})
+
+		So(err, ShouldBeNil)
+		So(ghosts, ShouldEqual, 1)
 	})
 }
 
@@ -195,6 +220,21 @@ func TestMapAlertStatuses(t *testing.T) {
 		expected := &nagios.NagiosStatus{"Chaucer - Meta Space Used: 8% - Data Space Used: 2% - Meta Space Used: 8%", nagios.NAGIOS_UNKNOWN}
 
 		So(status, ShouldHaveTheSameNagiosStatusAs, expected)
+	})
+
+	Convey("Correctly handles the exit status when ghosts are present", t, func() {
+		var info DockerInfo
+		var stub stubFetcher
+		opts := CliOpts{
+			CritMetaSpace: 100,
+			CritDataSpace: 100,
+			GhostsStatus: 2,
+		}
+		fetchInfo(stub, opts, &info)
+		results := mapAlertStatuses(&info, &opts)
+
+		expected := &nagios.NagiosStatus{"Ghost Containers: 1", nagios.NAGIOS_CRITICAL}
+		So(results[2], ShouldHaveTheSameNagiosStatusAs, expected)
 	})
 }
 

@@ -19,12 +19,13 @@ const (
 
 // A struct representing CLI opts that will be passed at runtime
 type CliOpts struct {
-	BaseUrl       string
-	CritDataSpace int
-	WarnDataSpace int
-	CritMetaSpace int
-	WarnMetaSpace int
-	ImageId       string
+	BaseUrl        string
+	CritDataSpace  int
+	WarnDataSpace  int
+	CritMetaSpace  int
+	WarnMetaSpace  int
+	ImageId        string
+	GhostsStatus   int
 }
 
 // Information describing the status of a Docker host
@@ -135,23 +136,26 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 	return nil
 }
 
-// checkRunningImage looks to see if a container is currently running from a given
+// checkRunningContainers looks to see if a container is currently running from a given
 // Image Id.
-func checkRunningImage(contents []byte, opts *CliOpts) (bool, error) {
+func checkRunningContainers(contents []byte, opts *CliOpts) (bool, int, error) {
 	var containers []Container
 
 	err := json.Unmarshal(contents, &containers)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
 	isRunning := false
+	ghostCount := 0
 	for _, container := range containers {
 		if strings.HasPrefix(container.Image, opts.ImageId+":") && strings.HasPrefix(container.Status, "Up") {
 			isRunning = true
+		} else if strings.Contains(container.Status, "Ghost") {
+			ghostCount += 1
 		}
 	}
-	return isRunning, nil
+	return isRunning, ghostCount, nil
 }
 
 // fetchInfo retrieves JSON from a Docker host and fills in a DockerInfo
@@ -160,10 +164,12 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 	wg.Add(2)
 
 	var err, err2 error
-	var ImageFound bool
+	var imageFound bool
+	var ghostCount int
 
 	go func() {
-		infoResult, err := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
+		var infoResult []byte
+		infoResult, err = fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/info")
 		if err == nil {
 			err = populateInfo(infoResult, info)
 		}
@@ -171,9 +177,10 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 	}()
 
 	go func() {
-		containersResult, err2 := fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/containers/json")
+		var containersResult []byte
+		containersResult, err2 = fetcher.Fetch(opts.BaseUrl + "/" + API_VERSION + "/containers/json")
 		if err2 == nil {
-			ImageFound, err2 = checkRunningImage(containersResult, &opts)
+			imageFound, ghostCount, err2 = checkRunningContainers(containersResult, &opts)
 		}
 		wg.Done()
 	}()
@@ -184,7 +191,8 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 		return err
 	}
 
-	info.ImageIsRunning = ImageFound
+	info.ImageIsRunning = imageFound
+	info.GhostCount = ghostCount
 
 	return nil
 }
@@ -215,6 +223,12 @@ func defineChecks(info *DockerInfo, opts *CliOpts) []checkArgs {
 			info.DataSpaceUsed/info.DataSpaceTotal*100 < float64(opts.WarnDataSpace),
 			"%",
 			nagios.NAGIOS_WARNING,
+		},
+		checkArgs{"Ghost Containers",
+			strconv.Itoa(info.GhostCount),
+			info.GhostCount == 0,
+			"",
+			nagios.NagiosStatusVal(opts.GhostsStatus),
 		},
 	}
 
@@ -265,6 +279,7 @@ func parseCommandLine() *CliOpts {
 	flag.IntVar(&opts.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.IntVar(&opts.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
 	flag.StringVar(&opts.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
+	flag.IntVar(&opts.GhostsStatus, "ghosts-status", 1, "If ghosts are present, treat as this status")
 
 	flag.Parse()
 
