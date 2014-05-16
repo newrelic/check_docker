@@ -278,7 +278,7 @@ func mapAlertStatuses(info *DockerInfo, opts *CliOpts) []*nagios.NagiosStatus {
 func parseCommandLine() *CliOpts {
 	var opts CliOpts
 
-	flag.StringVar(&opts.BaseUrl, "base-url", "http://chi-staging-pool-1:4243/", "The Base URL for the Docker server")
+	flag.StringVar(&opts.BaseUrl, "base-url", "", "The Base URL for the Docker server")
 	flag.IntVar(&opts.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
 	flag.IntVar(&opts.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.IntVar(&opts.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
@@ -293,6 +293,10 @@ func parseCommandLine() *CliOpts {
 
 func main() {
 	opts := parseCommandLine()
+
+	if opts.BaseUrl == "" {
+		nagios.Critical(errors.New("-base-url must be supplied"))
+	}
 
 	var fetcher Fetcher
 	var info DockerInfo
