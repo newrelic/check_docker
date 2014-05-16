@@ -48,3 +48,20 @@ are present on the server. The number follows standard Nagios conventions.
 `-(warn|crit)-(meta|data)-space`: the thresholds at which the named Nagios status codes
 should be emitted. These are percentages, so `-crit-data-space=95` would send
 a CRITICAL response when the threshold of 95% is crossed.
+
+Contributions
+-------------
+
+Contributions are more than welcome. Bug reports with specific reproduction
+steps are great. If you have a code contribution you'd like to make, open a
+pull request with suggested code.
+
+Pull requests should:
+
+ * Clearly state their intent in the title
+ * Have a description that explains the need for the changes
+ * Include tests!
+ * Not break the public API
+
+
+Copyright (c) 2014 New Relic, Inc. All rights reserved.
