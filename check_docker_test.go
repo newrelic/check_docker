@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
-	"source.datanerd.us/site-engineering/go_nagios"
+	"github.com/newrelic/go_nagios"
 )
 
 var infoJsonFromApi []byte = []byte(
