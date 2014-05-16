@@ -12,14 +12,14 @@ Docker daemon, one to `/info` and one to `/containers/json`
 and processes the results, all simultaneously.
 
 It is built using the the 
-[go_nagios](http://source.datanerd.us/site-engineering/go_nagios)
+[go_nagios](http://github.com/newrelic/go_nagios)
 framework.
 
 Building
 --------
 
 ```
-go get source.datanerd.us/site-engineering/go_nagios
+go get github.com/newrelic/go_nagios
 go build
 ```
 

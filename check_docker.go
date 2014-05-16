@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"source.datanerd.us/site-engineering/go_nagios"
+	"github.com/newrelic/go_nagios"
 )
 
 const (
