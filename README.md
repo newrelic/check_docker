@@ -19,7 +19,7 @@ Building
 --------
 
 ```
-go fetch source.datanerd.us/site-engineering/go_nagios
+go get source.datanerd.us/site-engineering/go_nagios
 go build
 ```
 
