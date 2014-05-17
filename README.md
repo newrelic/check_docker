@@ -15,6 +15,13 @@ It is built using the the
 [go_nagios](http://github.com/newrelic/go_nagios)
 framework.
 
+Installing
+----------
+You can install compiled, statically-linked
+[binaries](https://github.com/newrelic/check_docker/releases) for Linux or
+MacOSX. Simply download the tarball, extract it and use the binary of your
+choice.
+
 Building
 --------
 
