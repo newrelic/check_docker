@@ -2,7 +2,7 @@ check_docker
 ============
 
 A Nagios check to check some basic statistics reported by the Docker daemon.
-Additionally validates the absence of Ghost containers and and may optionally
+Additionally validates the absence of Ghost containers and may optionally
 be made to require the presence of a container running from a particular image
 tag.
 
