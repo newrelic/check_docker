@@ -6,18 +6,49 @@ import (
 	"strings"
 	"testing"
 
-	. "github.com/smartystreets/goconvey/convey"
 	"github.com/newrelic/go_nagios"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
-var infoJsonFromApi []byte = []byte(
+var devicemapperInfoJsonFromApi []byte = []byte(
 	`{
+		"Driver": "devicemapper",
 		"DriverStatus": [
 			["Data Space Used", "20.0 mb"],
 			["Data Space Total", "1000.0 mb"],
 			["Metadata Space Used", "15.0 mb"],
 			["Metadata Space Total", "200.0 mb"]
 		]
+	}`,
+)
+
+var aufsInfoJsonFromApi []byte = []byte(
+	`
+	{
+		"Containers": 0,
+		"Debug": 0,
+		"Driver": "aufs",
+		"DriverStatus": [
+			["Root Dir","/data/docker/aufs"],
+			["Dirs","0"]
+		],
+		"ExecutionDriver": "native-0.2",
+		"IPv4Forwarding": 1,
+		"Images": 0,
+		"IndexServerAddress": "https://index.docker.io/v1/",
+		"InitPath": "/usr/bin/docker",
+		"InitSha1": "",
+		"KernelVersion": "3.8.0-35-generic",
+		"MemoryLimit": 1,
+		"NEventsListener": 0,
+		"NFd": 11,
+		"NGoroutines": 11,
+		"Sockets": [
+			"tcp://0.0.0.0:4243",
+			"tcp://0.0.0.0:2375",
+			"unix:///var/run/docker.sock"
+		],
+		"SwapLimit":1
 	}`,
 )
 
@@ -84,7 +115,7 @@ type stubFetcher struct{}
 
 func (fetcher stubFetcher) Fetch(url string) ([]byte, error) {
 	if strings.Contains(url, "/info") {
-		return infoJsonFromApi, nil
+		return devicemapperInfoJsonFromApi, nil
 	}
 
 	if strings.Contains(url, "/containers") {
@@ -129,19 +160,21 @@ func TestFindDriverStatus(t *testing.T) {
 }
 
 func TestPopulateDriverInfo(t *testing.T) {
-	Convey("Correctly parses the JSON and populates the DockerInfo", t, func() {
+	Convey("Correctly parses devicemapper /info JSON and populates the DockerInfo", t, func() {
 		var info DockerInfo
-		err := populateInfo(infoJsonFromApi, &info)
+		err := populateInfo(devicemapperInfoJsonFromApi, &info)
 
 		So(err, ShouldBeNil)
+		So(info.Driver, ShouldEqual, "devicemapper")
 		So(info.DataSpaceUsed, ShouldEqual, 20.0)
 	})
 
-	Convey("Returns an intelligent error when the key is not found", t, func() {
+	Convey("Correctly parses AUFS /info JSON and populates the DockerInfo", t, func() {
 		var info DockerInfo
-		err := populateInfo([]byte(`{}`), &info)
+		err := populateInfo(aufsInfoJsonFromApi, &info)
 
-		So(err.Error(), ShouldContainSubstring, "Can't find key: Data Space Used")
+		So(err, ShouldBeNil)
+		So(info.Driver, ShouldEqual, "aufs")
 	})
 }
 
@@ -201,9 +234,19 @@ func TestMapAlertStatuses(t *testing.T) {
 		WarnDataSpace: 5.0,
 	}
 
-	Convey("When handed a DockerInfo, returns a list of check results", t, func() {
+	Convey("Given AUFS /info JSON, when handed a DockerInfo, don't break", t, func() {
 		var info DockerInfo
-		populateInfo(infoJsonFromApi, &info)
+		err := populateInfo(aufsInfoJsonFromApi, &info)
+
+		So(err, ShouldBeNil)
+
+		results := mapAlertStatuses(&info, &opts)
+		So(len(results), ShouldEqual, 0)
+	})
+
+	Convey("Given devicemapper /info JSON, when handed a DockerInfo, returns a list of check results", t, func() {
+		var info DockerInfo
+		populateInfo(devicemapperInfoJsonFromApi, &info)
 		results := mapAlertStatuses(&info, &opts)
 
 		So(results[0], ShouldHaveTheSameNagiosStatusAs, &nagios.NagiosStatus{"Meta Space Used: 8%", nagios.NAGIOS_CRITICAL})
@@ -212,7 +255,7 @@ func TestMapAlertStatuses(t *testing.T) {
 
 	Convey("Produces output that can properly be aggregated by Nagios", t, func() {
 		var info DockerInfo
-		populateInfo(infoJsonFromApi, &info)
+		populateInfo(devicemapperInfoJsonFromApi, &info)
 		results := mapAlertStatuses(&info, &opts)
 
 		status := &nagios.NagiosStatus{"Chaucer", nagios.NAGIOS_UNKNOWN}
@@ -228,7 +271,7 @@ func TestMapAlertStatuses(t *testing.T) {
 		opts := CliOpts{
 			CritMetaSpace: 100,
 			CritDataSpace: 100,
-			GhostsStatus: 2,
+			GhostsStatus:  2,
 		}
 		fetchInfo(stub, opts, &info)
 		results := mapAlertStatuses(&info, &opts)
@@ -240,7 +283,7 @@ func TestMapAlertStatuses(t *testing.T) {
 
 func ShouldHaveTheSameNagiosStatusAs(actual interface{}, expected ...interface{}) string {
 	wanted := expected[0].(*nagios.NagiosStatus)
-	got    := actual.(*nagios.NagiosStatus)
+	got := actual.(*nagios.NagiosStatus)
 
 	if got.Value != wanted.Value || got.Message != wanted.Message {
 		return "expected:\n" + fmt.Sprintf("%#v", wanted) + "\n\ngot:\n" + fmt.Sprintf("%#v", got)

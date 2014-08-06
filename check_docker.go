@@ -19,18 +19,19 @@ const (
 
 // A struct representing CLI opts that will be passed at runtime
 type CliOpts struct {
-	BaseUrl        string
-	CritDataSpace  int
-	WarnDataSpace  int
-	CritMetaSpace  int
-	WarnMetaSpace  int
-	ImageId        string
-	GhostsStatus   int
+	BaseUrl       string
+	CritDataSpace int
+	WarnDataSpace int
+	CritMetaSpace int
+	WarnMetaSpace int
+	ImageId       string
+	GhostsStatus  int
 }
 
 // Information describing the status of a Docker host
 type DockerInfo struct {
 	Containers     float64
+	Driver         string
 	DriverStatus   [][]string
 	DataSpaceUsed  float64
 	DataSpaceTotal float64
@@ -124,12 +125,11 @@ func populateInfo(contents []byte, info *DockerInfo) error {
 
 	for key, val := range fields {
 		entry := findDriverStatus(key, info.DriverStatus)
-		if entry == "" {
-			return errors.New("Error parsing response from API! Can't find key: " + key)
-		}
-		*val, err = megabytesFloat64(findDriverStatus(key, info.DriverStatus))
-		if err != nil {
-			return errors.New("Error parsing response from API! " + err.Error())
+		if entry != "" {
+			*val, err = megabytesFloat64(findDriverStatus(key, info.DriverStatus))
+			if err != nil {
+				return errors.New("Error parsing response from API! " + err.Error())
+			}
 		}
 	}
 
@@ -204,37 +204,41 @@ func fetchInfo(fetcher HttpResponseFetcher, opts CliOpts, info *DockerInfo) erro
 
 // defineChecks returns a list of checks we should run based on CLI flags
 func defineChecks(info *DockerInfo, opts *CliOpts) []checkArgs {
-	checks := []checkArgs{
-		checkArgs{"Meta Space Used",
-			float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
-			info.MetaSpaceUsed/info.MetaSpaceTotal*100 < float64(opts.CritMetaSpace),
-			"%",
-			nagios.NAGIOS_CRITICAL,
-		},
-		checkArgs{"Data Space Used",
-			float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
-			info.DataSpaceUsed/info.DataSpaceTotal*100 < float64(opts.CritDataSpace),
-			"%",
-			nagios.NAGIOS_CRITICAL,
-		},
-		checkArgs{"Meta Space Used",
-			float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
-			info.MetaSpaceUsed/info.MetaSpaceTotal*100 < float64(opts.WarnMetaSpace),
-			"%",
-			nagios.NAGIOS_WARNING,
-		},
-		checkArgs{"Data Space Used",
-			float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
-			info.DataSpaceUsed/info.DataSpaceTotal*100 < float64(opts.WarnDataSpace),
-			"%",
-			nagios.NAGIOS_WARNING,
-		},
-		checkArgs{"Ghost Containers",
-			strconv.Itoa(info.GhostCount),
-			info.GhostCount == 0,
-			"",
-			nagios.NagiosStatusVal(opts.GhostsStatus),
-		},
+	checks := make([]checkArgs, 0)
+
+	if info.Driver == "devicemapper" {
+		checks = append(checks,
+			checkArgs{"Meta Space Used",
+				float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
+				info.MetaSpaceUsed/info.MetaSpaceTotal*100 < float64(opts.CritMetaSpace),
+				"%",
+				nagios.NAGIOS_CRITICAL,
+			},
+			checkArgs{"Data Space Used",
+				float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
+				info.DataSpaceUsed/info.DataSpaceTotal*100 < float64(opts.CritDataSpace),
+				"%",
+				nagios.NAGIOS_CRITICAL,
+			},
+			checkArgs{"Meta Space Used",
+				float64String(info.MetaSpaceUsed / info.MetaSpaceTotal * 100),
+				info.MetaSpaceUsed/info.MetaSpaceTotal*100 < float64(opts.WarnMetaSpace),
+				"%",
+				nagios.NAGIOS_WARNING,
+			},
+			checkArgs{"Data Space Used",
+				float64String(info.DataSpaceUsed / info.DataSpaceTotal * 100),
+				info.DataSpaceUsed/info.DataSpaceTotal*100 < float64(opts.WarnDataSpace),
+				"%",
+				nagios.NAGIOS_WARNING,
+			},
+			checkArgs{"Ghost Containers",
+				strconv.Itoa(info.GhostCount),
+				info.GhostCount == 0,
+				"",
+				nagios.NagiosStatusVal(opts.GhostsStatus),
+			},
+		)
 	}
 
 	if opts.ImageId != "" {
