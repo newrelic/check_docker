@@ -29,7 +29,7 @@ var aufsInfoJsonFromApi []byte = []byte(
 		"Debug": 0,
 		"Driver": "aufs",
 		"DriverStatus": [
-			["Root Dir","/data/docker/aufs"],
+			["Root Dir","/usr/local/lib/docker/aufs"],
 			["Dirs","0"]
 		],
 		"ExecutionDriver": "native-0.2",
