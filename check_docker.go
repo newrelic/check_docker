@@ -311,8 +311,11 @@ func main() {
 	}
 
 	statuses := mapAlertStatuses(&info, opts)
-	baseStatus := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
 
-	baseStatus.Aggregate(statuses)
-	nagios.ExitWithStatus(&baseStatus)
+	baseStatus := nagios.NagiosStatus{float64String(info.Containers) + " containers", 0}
+	perfdata := nagios.NagiosPerformanceVal{"containers", float64String(info.Containers), "", "", "", "", ""}
+	perfStatus := nagios.NagiosStatusWithPerformanceData{&baseStatus, perfdata}
+
+	perfStatus.Aggregate(statuses)
+	perfStatus.NagiosExit()
 }
