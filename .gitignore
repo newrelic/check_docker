@@ -1,3 +1,4 @@
 *.swo
 *.swp
 check_docker
+.vagrant
