@@ -214,8 +214,14 @@ func main() {
 	baseStatus := &nagios.NagiosStatus{fmt.Sprintf("Total Containers: %v", len(cd.dockerContainersData)), nagios.NAGIOS_OK}
 
 	statuses := make([]*nagios.NagiosStatus, 0)
-	statuses = append(statuses, cd.CheckMetaSpace(cd.WarnMetaSpace, cd.CritMetaSpace))
-	statuses = append(statuses, cd.CheckDataSpace(cd.WarnDataSpace, cd.CritDataSpace))
+
+	driver := cd.dockerInfoData.Get("Driver")
+
+	// Unfortunately, Metadata Space and Data Space information is only available on devicemapper
+	if driver == "devicemapper" {
+		statuses = append(statuses, cd.CheckMetaSpace(cd.WarnMetaSpace, cd.CritMetaSpace))
+		statuses = append(statuses, cd.CheckDataSpace(cd.WarnDataSpace, cd.CritDataSpace))
+	}
 
 	if cd.ImageId != "" {
 		statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(cd.ImageId))
