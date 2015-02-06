@@ -13,17 +13,13 @@ import (
 )
 
 func NewCheckDocker(endpoint string) (*CheckDocker, error) {
-	var err error
 	cd := &CheckDocker{}
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
 	cd.WarnDataSpace = 100
 	cd.CritDataSpace = 100
 
-	cd.dockerclient, err = dockerlib.NewClient(endpoint)
-	if err != nil {
-		return nil, err
-	}
+	err := cd.setupClient(endpoint)
 
 	return cd, err
 }
@@ -34,9 +30,24 @@ type CheckDocker struct {
 	WarnDataSpace        float64
 	CritDataSpace        float64
 	ImageId              string
+	TLSCertPath          string
+	TLSKeyPath           string
+	TLSCAPath            string
 	dockerclient         *dockerlib.Client
 	dockerInfoData       *dockerlib.Env
 	dockerContainersData []dockerlib.APIContainers
+}
+
+func (cd *CheckDocker) setupClient(endpoint string) error {
+	var err error
+
+	if cd.TLSCertPath != "" && cd.TLSKeyPath != "" && cd.TLSCAPath != "" {
+		cd.dockerclient, err = dockerlib.NewTLSClient(endpoint, cd.TLSCertPath, cd.TLSKeyPath, cd.TLSCAPath)
+	} else {
+		cd.dockerclient, err = dockerlib.NewClient(endpoint)
+	}
+
+	return err
 }
 
 func (cd *CheckDocker) GetData() error {
@@ -203,8 +214,16 @@ func main() {
 	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
 	flag.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
+	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
+	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
+	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
 
 	flag.Parse()
+
+	err = cd.setupClient(dockerEndpoint)
+	if err != nil {
+		nagios.Critical(err)
+	}
 
 	err = cd.GetData()
 	if err != nil {

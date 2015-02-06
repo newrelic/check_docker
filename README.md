@@ -39,6 +39,9 @@ Usage of ./check_docker:
   -warn-meta-space=100: Warning threshold for Metadata Space
   -crit-meta-space=100: Critical threshold for Metadata Space
   -image-id="": An image ID that must be running on the Docker server
+  -tls-cert="": Path to TLS cert file
+  -tls-key="": Path to TLS key file
+  -tls-ca="": Path to TLS CA file
 ```
 
 `-base-url`: Here you specify the base url of the docker server.
