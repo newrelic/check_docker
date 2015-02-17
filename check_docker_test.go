@@ -45,10 +45,23 @@ func NewCheckDockerForTest(t *testing.T) *CheckDocker {
 	}
 
 	cd, err := NewCheckDocker(endpoint)
-
 	if err != nil {
 		t.Fatalf("Failed to initialize CheckDocker. Error: %v", err)
 	}
+
+	tlsVerify := os.Getenv("DOCKER_TLS_VERIFY")
+	if tlsVerify == "1" {
+		certPath := os.Getenv("DOCKER_CERT_PATH")
+		cd.TLSCertPath = certPath + "/cert.pem"
+		cd.TLSKeyPath = certPath + "/key.pem"
+		cd.TLSCAPath = certPath + "/ca.pem"
+	}
+
+	err = cd.setupClient()
+	if err != nil {
+		t.Fatalf("Failed to initialize docker client. Error: %v", err)
+	}
+
 	if cd.dockerclient == nil {
 		t.Fatalf("Failed to initialize docker client. You must have a docker server (defined in DOCKER_HOST) to run test.")
 	}

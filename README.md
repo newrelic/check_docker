@@ -77,7 +77,7 @@ Testing for Contributors
 1. In Darwin(aufs), assuming you already setup Boot2Docker:
     ```
     cd $GOPATH/src/github.com/newrelic/check_docker
-    docker run hello-world
+		docker run -d busybox /bin/sh -c 'while true; do echo hello world; sleep 1; done'
     export DOCKER_IMAGE=$(docker ps | grep busybox | awk '{print $2}')
 
     cd $GOPATH/src/github.com/newrelic/check_docker
@@ -91,7 +91,7 @@ Testing for Contributors
     vagrant ssh
 
     # Inside Vagrant
-    sudo docker run hello-world
+		sudo docker run -d busybox /bin/sh -c 'while true; do echo hello world; sleep 1; done'
     export DOCKER_IMAGE=$(sudo docker ps | grep busybox | awk '{print $2}')
 
     export GOPATH=/go
