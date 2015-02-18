@@ -24,7 +24,7 @@ var (
 	endpoint      string
 )
 
-func NewCheckDocker(endpoint string) (*CheckDocker, error) {
+func NewCheckDocker(endpoint string) *CheckDocker {
 	cd := &CheckDocker{}
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
@@ -32,7 +32,7 @@ func NewCheckDocker(endpoint string) (*CheckDocker, error) {
 	cd.CritDataSpace = 100
 	cd.dockerEndpoint = endpoint
 
-	return cd, nil
+	return cd
 }
 
 type CheckDocker struct {
@@ -228,11 +228,7 @@ func init() {
 func main() {
 	flag.Parse()
 
-	cd, err := NewCheckDocker(endpoint)
-	if err != nil {
-		nagios.Critical(err)
-	}
-
+	cd := NewCheckDocker(endpoint)
 	cd.WarnMetaSpace = warnMetaSpace
 	cd.CritMetaSpace = critMetaSpace
 	cd.WarnDataSpace = warnDataSpace
@@ -242,7 +238,7 @@ func main() {
 	cd.TLSKeyPath = tlsKeyPath
 	cd.TLSCAPath = tlsCAPath
 
-	err = cd.setupClient()
+	err := cd.setupClient()
 	if err != nil {
 		nagios.Critical(err)
 	}
