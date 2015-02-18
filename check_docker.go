@@ -32,8 +32,7 @@ func NewCheckDocker(endpoint string) (*CheckDocker, error) {
 	cd.CritDataSpace = 100
 	cd.dockerEndpoint = endpoint
 
-	err := cd.setupClient()
-	return cd, err
+	return cd, nil
 }
 
 type CheckDocker struct {
