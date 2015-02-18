@@ -12,16 +12,27 @@ import (
 	"sync"
 )
 
-func NewCheckDocker(endpoint string) (*CheckDocker, error) {
+var (
+	warnMetaSpace float64
+	critMetaSpace float64
+	warnDataSpace float64
+	critDataSpace float64
+	imageId       string
+	tlsCertPath   string
+	tlsKeyPath    string
+	tlsCAPath     string
+	endpoint      string
+)
+
+func NewCheckDocker(endpoint string) *CheckDocker {
 	cd := &CheckDocker{}
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
 	cd.WarnDataSpace = 100
 	cd.CritDataSpace = 100
+	cd.dockerEndpoint = endpoint
 
-	err := cd.setupClient(endpoint)
-
-	return cd, err
+	return cd
 }
 
 type CheckDocker struct {
@@ -33,18 +44,19 @@ type CheckDocker struct {
 	TLSCertPath          string
 	TLSKeyPath           string
 	TLSCAPath            string
+	dockerEndpoint       string
 	dockerclient         *dockerlib.Client
 	dockerInfoData       *dockerlib.Env
 	dockerContainersData []dockerlib.APIContainers
 }
 
-func (cd *CheckDocker) setupClient(endpoint string) error {
+func (cd *CheckDocker) setupClient() error {
 	var err error
 
 	if cd.TLSCertPath != "" && cd.TLSKeyPath != "" && cd.TLSCAPath != "" {
-		cd.dockerclient, err = dockerlib.NewTLSClient(endpoint, cd.TLSCertPath, cd.TLSKeyPath, cd.TLSCAPath)
+		cd.dockerclient, err = dockerlib.NewTLSClient(cd.dockerEndpoint, cd.TLSCertPath, cd.TLSKeyPath, cd.TLSCAPath)
 	} else {
-		cd.dockerclient, err = dockerlib.NewClient(endpoint)
+		cd.dockerclient, err = dockerlib.NewClient(cd.dockerEndpoint)
 	}
 
 	return err
@@ -201,26 +213,32 @@ func (cd *CheckDocker) CheckImageContainerIsInGoodShape(imageId string) *nagios.
 	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in top shape.", containerRunning.ID, imageId), nagios.NAGIOS_OK}
 }
 
+func init() {
+	flag.StringVar(&endpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
+	flag.Float64Var(&warnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
+	flag.Float64Var(&critMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
+	flag.Float64Var(&warnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
+	flag.Float64Var(&critDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
+	flag.StringVar(&imageId, "image-id", "", "An image ID that must be running on the Docker server")
+	flag.StringVar(&tlsCertPath, "tls-cert", "", "Path to TLS cert file.")
+	flag.StringVar(&tlsKeyPath, "tls-key", "", "Path to TLS key file.")
+	flag.StringVar(&tlsCAPath, "tls-ca", "", "Path to TLS CA file.")
+}
+
 func main() {
-	dockerEndpoint := *flag.String("base-url", "http://localhost:2375", "The Base URL for the Docker server")
-
-	cd, err := NewCheckDocker(dockerEndpoint)
-	if err != nil {
-		nagios.Critical(err)
-	}
-
-	flag.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
-	flag.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
-	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
-	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
-	flag.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
-	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
-	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
-	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
-
 	flag.Parse()
 
-	err = cd.setupClient(dockerEndpoint)
+	cd := NewCheckDocker(endpoint)
+	cd.WarnMetaSpace = warnMetaSpace
+	cd.CritMetaSpace = critMetaSpace
+	cd.WarnDataSpace = warnDataSpace
+	cd.CritDataSpace = critDataSpace
+	cd.ImageId = imageId
+	cd.TLSCertPath = tlsCertPath
+	cd.TLSKeyPath = tlsKeyPath
+	cd.TLSCAPath = tlsCAPath
+
+	err := cd.setupClient()
 	if err != nil {
 		nagios.Critical(err)
 	}
