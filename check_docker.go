@@ -13,13 +13,17 @@ import (
 )
 
 func NewCheckDocker(endpoint string) (*CheckDocker, error) {
+	var err error
+
 	cd := &CheckDocker{}
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
 	cd.WarnDataSpace = 100
 	cd.CritDataSpace = 100
 
-	err := cd.setupClient(endpoint)
+	if endpoint != "" {
+		err = cd.setupClient(endpoint)
+	}
 
 	return cd, err
 }
@@ -202,13 +206,14 @@ func (cd *CheckDocker) CheckImageContainerIsInGoodShape(imageId string) *nagios.
 }
 
 func main() {
-	dockerEndpoint := *flag.String("base-url", "http://localhost:2375", "The Base URL for the Docker server")
-
-	cd, err := NewCheckDocker(dockerEndpoint)
+	cd, err := NewCheckDocker("")
 	if err != nil {
 		nagios.Critical(err)
 	}
 
+	var dockerEndpoint string
+
+	flag.StringVar(&dockerEndpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
 	flag.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
 	flag.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
