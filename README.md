@@ -80,9 +80,9 @@ Testing for Contributors
 
 1. In Darwin(aufs), assuming you already setup Boot2Docker:
     ```
-    cd $GOPATH/src/github.com/newrelic/check_docker
-    docker run hello-world
-    export DOCKER_IMAGE=$(docker ps | grep busybox | awk '{print $2}')
+    docker run -t -d --name named_container busybox:latest
+    export DOCKER_IMAGE=busybox:latest
+    export DOCKER_CONTAINER_NAME=named_container
 
     cd $GOPATH/src/github.com/newrelic/check_docker
     go get ./... && go test
@@ -95,8 +95,9 @@ Testing for Contributors
     vagrant ssh
 
     # Inside Vagrant
-    sudo docker run hello-world
-    export DOCKER_IMAGE=$(sudo docker ps | grep busybox | awk '{print $2}')
+    sudo docker run -t -d --name named_container busybox:latest
+    export DOCKER_IMAGE=busybox:latest
+    export DOCKER_CONTAINER_NAME=named_container
 
     export GOPATH=/go
     cd $GOPATH/src/github.com/newrelic/check_docker
