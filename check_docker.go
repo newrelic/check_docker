@@ -34,6 +34,7 @@ type CheckDocker struct {
 	WarnDataSpace        float64
 	CritDataSpace        float64
 	ImageId              string
+	ContainerName        string
 	TLSCertPath          string
 	TLSKeyPath           string
 	TLSCAPath            string
@@ -132,6 +133,27 @@ func (cd *CheckDocker) IsContainerRunning(imageId string) (dockerlib.APIContaine
 	return dockerlib.APIContainers{}, false
 }
 
+func (cd *CheckDocker) IsNamedContainerRunning(containerName string) (dockerlib.APIContainers, bool) {
+	for _, container := range cd.dockerContainersData {
+		for _, name := range container.Names {
+			// Container names start with a slash for some reason, maybe a bug?
+			// Remove the leading / only if it's found so this doesn't break in
+			// the future.
+			if strings.HasPrefix(name, "/") {
+				name = name[1:]
+			}
+			if name == containerName {
+				if strings.HasPrefix(container.Status, "Up") {
+					return container, true
+				} else {
+					return dockerlib.APIContainers{}, false
+				}
+			}
+		}
+	}
+	return dockerlib.APIContainers{}, false
+}
+
 func (cd *CheckDocker) IsContainerAGhost(imageId string) (dockerlib.APIContainers, bool) {
 	for _, container := range cd.dockerContainersData {
 		if strings.HasPrefix(container.Image, imageId) && strings.Contains(container.Status, "Ghost") {
@@ -205,6 +227,20 @@ func (cd *CheckDocker) CheckImageContainerIsInGoodShape(imageId string) *nagios.
 	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in top shape.", containerRunning.ID, imageId), nagios.NAGIOS_OK}
 }
 
+func (cd *CheckDocker) CheckNamedContainerIsInGoodShape(containerName string) *nagios.NagiosStatus {
+	container, isRunning := cd.IsNamedContainerRunning(containerName)
+	_, isGhost := cd.IsContainerAGhost(container.ID)
+
+	if !isRunning {
+		return &nagios.NagiosStatus{fmt.Sprintf("Container named: %v is not running.", containerName), nagios.NAGIOS_CRITICAL}
+	}
+	if isGhost {
+		return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in ghost state.", container.ID, containerName), nagios.NAGIOS_CRITICAL}
+	}
+
+	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in top shape.", container.ID, containerName), nagios.NAGIOS_OK}
+}
+
 func main() {
 	cd, err := NewCheckDocker("")
 	if err != nil {
@@ -219,6 +255,7 @@ func main() {
 	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
 	flag.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
+	flag.StringVar(&cd.ContainerName, "container-name", "", "The name of a container that must be running on the Docker server")
 	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
 	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
 	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
@@ -249,6 +286,10 @@ func main() {
 
 	if cd.ImageId != "" {
 		statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(cd.ImageId))
+	}
+
+	if cd.ContainerName != "" {
+		statuses = append(statuses, cd.CheckNamedContainerIsInGoodShape(cd.ContainerName))
 	}
 
 	baseStatus.Aggregate(statuses)

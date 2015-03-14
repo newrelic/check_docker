@@ -34,6 +34,7 @@ Usage
 ```
 Usage of ./check_docker:
   -base-url="http://docker-server:2375": The Base URL for the Docker server
+  -container-name="": The name of a container that must be running on the Docker server
   -warn-data-space=100: Warning threshold for Data Space
   -crit-data-space=100: Critical threshold for Data Space
   -warn-meta-space=100: Warning threshold for Metadata Space
@@ -45,6 +46,9 @@ Usage of ./check_docker:
 ```
 
 `-base-url`: Here you specify the base url of the docker server.
+
+`-container-name`: Allows you to specify the name of a container that should be running
+on the server.
 
 `-image-id`: You can specify an image tag that needs to be running on the server for
 certain cases where you have pegged a container to a server (e.g. each server
