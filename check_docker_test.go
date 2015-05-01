@@ -7,8 +7,8 @@ import (
 )
 
 func init() {
-	if os.Getenv("DOCKER_IMAGE") == "" {
-		println("You must set DOCKER_IMAGE to test image related things.")
+	if os.Getenv("DOCKER_IMAGE") == "" || os.Getenv("DOCKER_CONTAINER_NAME") == "" {
+		println("You must set DOCKER_IMAGE and DOCKER_CONTAINER_NAME to test image related things.")
 	}
 }
 
@@ -102,6 +102,28 @@ func TestIsContainerRunning(t *testing.T) {
 	}
 }
 
+func TestIsNamedContainerRunning(t *testing.T) {
+	containerName := os.Getenv("DOCKER_CONTAINER_NAME")
+
+	if containerName == "" {
+		return
+	}
+
+	cd := NewCheckDockerForTest(t)
+	_, isRunning := cd.IsNamedContainerRunning(containerName)
+
+	if !isRunning {
+		t.Errorf("Container named: %v should be running.", containerName)
+	}
+
+	containerName = "no_container_with_this_name_should_exist"
+	_, isRunning = cd.IsNamedContainerRunning(containerName)
+
+	if isRunning {
+		t.Errorf("Container named: %v should not be running.", containerName)
+	}
+}
+
 func TestCountGhostsByImageId(t *testing.T) {
 	imageId := os.Getenv("DOCKER_IMAGE")
 
@@ -146,5 +168,23 @@ func TestCheckImageContainerIsInGoodShape(t *testing.T) {
 		if status.Value != 0 {
 			t.Errorf("Container of image: %v should be healthy.", imageId)
 		}
+	}
+}
+
+func TestCheckNamedContainerIsInGoodShape(t *testing.T) {
+	containerName := os.Getenv("DOCKER_CONTAINER_NAME")
+
+	if containerName == "" {
+		return
+	}
+
+	cd := NewCheckDockerForTest(t)
+	status := cd.CheckNamedContainerIsInGoodShape(containerName)
+
+	if status == nil {
+		t.Error("NagiosStatus struct should never be nil.")
+	}
+	if status.Value != 0 {
+		t.Errorf("Container named: %v should be healthy.", containerName)
 	}
 }

@@ -34,6 +34,7 @@ Usage
 ```
 Usage of ./check_docker:
   -base-url="http://docker-server:2375": The Base URL for the Docker server
+  -container-name="": The name of a container that must be running on the Docker server
   -warn-data-space=100: Warning threshold for Data Space
   -crit-data-space=100: Critical threshold for Data Space
   -warn-meta-space=100: Warning threshold for Metadata Space
@@ -45,6 +46,9 @@ Usage of ./check_docker:
 ```
 
 `-base-url`: Here you specify the base url of the docker server.
+
+`-container-name`: Allows you to specify the name of a container that should be running
+on the server.
 
 `-image-id`: You can specify an image tag that needs to be running on the server for
 certain cases where you have pegged a container to a server (e.g. each server
@@ -76,9 +80,9 @@ Testing for Contributors
 
 1. In Darwin(aufs), assuming you already setup Boot2Docker:
     ```
-    cd $GOPATH/src/github.com/newrelic/check_docker
-    docker run hello-world
-    export DOCKER_IMAGE=$(docker ps | grep busybox | awk '{print $2}')
+    docker run -t -d --name named_container busybox:latest
+    export DOCKER_IMAGE=busybox:latest
+    export DOCKER_CONTAINER_NAME=named_container
 
     cd $GOPATH/src/github.com/newrelic/check_docker
     go get ./... && go test
@@ -91,8 +95,9 @@ Testing for Contributors
     vagrant ssh
 
     # Inside Vagrant
-    sudo docker run hello-world
-    export DOCKER_IMAGE=$(sudo docker ps | grep busybox | awk '{print $2}')
+    sudo docker run -t -d --name named_container busybox:latest
+    export DOCKER_IMAGE=busybox:latest
+    export DOCKER_CONTAINER_NAME=named_container
 
     export GOPATH=/go
     cd $GOPATH/src/github.com/newrelic/check_docker
