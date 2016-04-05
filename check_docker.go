@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -39,7 +38,7 @@ type CheckDocker struct {
 	TLSKeyPath           string
 	TLSCAPath            string
 	dockerclient         *dockerlib.Client
-	dockerInfoData       *dockerlib.Env
+	dockerInfoData       *dockerlib.DockerInfo
 	dockerContainersData []dockerlib.APIContainers
 }
 
@@ -91,13 +90,8 @@ func (cd *CheckDocker) GetData() error {
 }
 
 func (cd *CheckDocker) getByteSizeDriverStatus(key string) (bytesize.ByteSize, error) {
-	var statusInArray [][]string
-
-	err := json.Unmarshal([]byte(cd.dockerInfoData.Get("DriverStatus")), &statusInArray)
-
-	if err != nil {
-		return -1, errors.New("Unable to extract DriverStatus info.")
-	}
+	var statusInArray [][2]string
+	statusInArray = cd.dockerInfoData.DriverStatus
 
 	for _, status := range statusInArray {
 		if status[0] == key {
@@ -276,7 +270,7 @@ func main() {
 
 	statuses := make([]*nagios.NagiosStatus, 0)
 
-	driver := cd.dockerInfoData.Get("Driver")
+	driver := cd.dockerInfoData.Driver
 
 	// Unfortunately, Metadata Space and Data Space information is only available on devicemapper
 	if driver == "devicemapper" {
