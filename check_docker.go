@@ -15,8 +15,8 @@ func NewCheckDocker(endpoint string) (*CheckDocker, error) {
 	var err error
 
 	cd := &CheckDocker{}
-	cd.ImageId = make([]string, 0)
-	cd.ContainerName = make([]string, 0)
+	cd.ImageIds = make([]string, 0)
+	cd.ContainerNames = make([]string, 0)
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
 	cd.WarnDataSpace = 100
@@ -34,8 +34,8 @@ type CheckDocker struct {
 	CritMetaSpace        float64
 	WarnDataSpace        float64
 	CritDataSpace        float64
-	ImageId              []string
-	ContainerName        []string
+	ImageIds             []string
+	ContainerNames       []string
 	TLSCertPath          string
 	TLSKeyPath           string
 	TLSCAPath            string
@@ -215,10 +215,10 @@ func (cd *CheckDocker) CheckImageContainerIsInGoodShape(imageId string) *nagios.
 		return &nagios.NagiosStatus{fmt.Sprintf("Container of image: %v is not running.", imageId), nagios.NAGIOS_CRITICAL}
 	}
 	if isGhost {
-		return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in ghost state.", containerGhost.ID, imageId), nagios.NAGIOS_CRITICAL}
+		return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in ghost state.", containerGhost.ID[:12], imageId), nagios.NAGIOS_CRITICAL}
 	}
 
-	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in top shape.", containerRunning.ID, imageId), nagios.NAGIOS_OK}
+	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) of image: %v is in top shape.", containerRunning.ID[:12], imageId), nagios.NAGIOS_OK}
 }
 
 func (cd *CheckDocker) CheckNamedContainerIsInGoodShape(containerName string) *nagios.NagiosStatus {
@@ -229,10 +229,10 @@ func (cd *CheckDocker) CheckNamedContainerIsInGoodShape(containerName string) *n
 		return &nagios.NagiosStatus{fmt.Sprintf("Container named: %v is not running.", containerName), nagios.NAGIOS_CRITICAL}
 	}
 	if isGhost {
-		return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in ghost state.", container.ID, containerName), nagios.NAGIOS_CRITICAL}
+		return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in ghost state.", container.ID[:12], containerName), nagios.NAGIOS_CRITICAL}
 	}
 
-	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in top shape.", container.ID, containerName), nagios.NAGIOS_OK}
+	return &nagios.NagiosStatus{fmt.Sprintf("Container(ID: %v) named: %v is in top shape.", container.ID[:12], containerName), nagios.NAGIOS_OK}
 }
 
 func main() {
@@ -242,16 +242,16 @@ func main() {
 	}
 
 	var dockerEndpoint string
-	var imageId multiStringArg
-	var contName multiStringArg
+	var imageIds multiStringArg
+	var contNames multiStringArg
 
 	flag.StringVar(&dockerEndpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
 	flag.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
 	flag.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
-	flag.Var(&imageId, "image-id", "An image ID that must be running on the Docker server")
-	flag.Var(&contName, "container-name", "The name of a container that must be running on the Docker server")
+	flag.Var(&imageIds, "image-id", "An image ID that must be running on the Docker server")
+	flag.Var(&contNames, "container-name", "The name of a container that must be running on the Docker server")
 	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
 	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
 	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
@@ -263,11 +263,11 @@ func main() {
 		nagios.Critical(err)
 	}
 
-	if imageId != nil && len(imageId) > 0 {
-		cd.ImageId = imageId
+	if imageIds != nil && len(imageIds) > 0 {
+		cd.ImageIds = imageIds
 	}
-	if contName != nil && len(contName) > 0 {
-		cd.ContainerName = contName
+	if contNames != nil && len(contNames) > 0 {
+		cd.ContainerNames = contNames
 	}
 
 	err = cd.GetData()
@@ -287,14 +287,14 @@ func main() {
 		statuses = append(statuses, cd.CheckDataSpace(cd.WarnDataSpace, cd.CritDataSpace))
 	}
 
-	if len(cd.ImageId) > 0 {
-		for _, imgId := range(cd.ImageId) {
+	if len(cd.ImageIds) > 0 {
+		for _, imgId := range(cd.ImageIds) {
 			statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(imgId))
 		}
 	}
 
-	if len(cd.ContainerName) > 0 {
-		for _, cName := range(cd.ContainerName) {
+	if len(cd.ContainerNames) > 0 {
+		for _, cName := range(cd.ContainerNames) {
 			statuses = append(statuses, cd.CheckNamedContainerIsInGoodShape(cName))
 		}
 	}
