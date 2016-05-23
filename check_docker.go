@@ -288,13 +288,13 @@ func main() {
 	}
 
 	if len(cd.ImageIds) > 0 {
-		for _, imgId := range(cd.ImageIds) {
+		for _, imgId := range cd.ImageIds {
 			statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(imgId))
 		}
 	}
 
 	if len(cd.ContainerNames) > 0 {
-		for _, cName := range(cd.ContainerNames) {
+		for _, cName := range cd.ContainerNames {
 			statuses = append(statuses, cd.CheckNamedContainerIsInGoodShape(cName))
 		}
 	}
