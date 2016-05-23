@@ -15,6 +15,8 @@ func NewCheckDocker(endpoint string) (*CheckDocker, error) {
 	var err error
 
 	cd := &CheckDocker{}
+	cd.ImageId = make([]string, 0)
+	cd.ContainerName = make([]string, 0)
 	cd.WarnMetaSpace = 100 // defaults
 	cd.CritMetaSpace = 100
 	cd.WarnDataSpace = 100
@@ -32,8 +34,8 @@ type CheckDocker struct {
 	CritMetaSpace        float64
 	WarnDataSpace        float64
 	CritDataSpace        float64
-	ImageId              string
-	ContainerName        string
+	ImageId              []string
+	ContainerName        []string
 	TLSCertPath          string
 	TLSKeyPath           string
 	TLSCAPath            string
@@ -240,14 +242,16 @@ func main() {
 	}
 
 	var dockerEndpoint string
+	var imageId multiStringArg
+	var contName multiStringArg
 
 	flag.StringVar(&dockerEndpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
 	flag.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
 	flag.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
 	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
 	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
-	flag.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
-	flag.StringVar(&cd.ContainerName, "container-name", "", "The name of a container that must be running on the Docker server")
+	flag.Var(&imageId, "image-id", "An image ID that must be running on the Docker server")
+	flag.Var(&contName, "container-name", "The name of a container that must be running on the Docker server")
 	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
 	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
 	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
@@ -257,6 +261,13 @@ func main() {
 	err = cd.setupClient(dockerEndpoint)
 	if err != nil {
 		nagios.Critical(err)
+	}
+
+	if imageId != nil && len(imageId) > 0 {
+		cd.ImageId = imageId
+	}
+	if contName != nil && len(contName) > 0 {
+		cd.ContainerName = contName
 	}
 
 	err = cd.GetData()
@@ -276,12 +287,16 @@ func main() {
 		statuses = append(statuses, cd.CheckDataSpace(cd.WarnDataSpace, cd.CritDataSpace))
 	}
 
-	if cd.ImageId != "" {
-		statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(cd.ImageId))
+	if len(cd.ImageId) > 0 {
+		for _, imgId := range(cd.ImageId) {
+			statuses = append(statuses, cd.CheckImageContainerIsInGoodShape(imgId))
+		}
 	}
 
-	if cd.ContainerName != "" {
-		statuses = append(statuses, cd.CheckNamedContainerIsInGoodShape(cd.ContainerName))
+	if len(cd.ContainerName) > 0 {
+		for _, cName := range(cd.ContainerName) {
+			statuses = append(statuses, cd.CheckNamedContainerIsInGoodShape(cName))
+		}
 	}
 
 	baseStatus.Aggregate(statuses)
