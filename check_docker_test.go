@@ -68,7 +68,7 @@ func TestNewCheckDocker(t *testing.T) {
 func TestGetByteSizeDriverStatus(t *testing.T) {
 	cd := NewCheckDockerForTest(t)
 
-	driver := cd.dockerInfoData.Get("Driver")
+	driver := cd.dockerInfoData.Driver
 
 	for _, key := range []string{"Data Space Used", "Data Space Total", "Metadata Space Used", "Metadata Space Total"} {
 		if driver == "aufs" {
