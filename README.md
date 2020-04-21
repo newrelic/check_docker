@@ -52,10 +52,16 @@ Usage of ./check_docker:
 `-container-name`: Allows you to specify the name of a container that should be running
 on the server.
 
+This argument can be specified multiple times to check multiple images. All must
+be running for the check to return an OK status.
+
 `-image-id`: You can specify an image tag that needs to be running on the server for
 certain cases where you have pegged a container to a server (e.g. each server
 has a Nagios monitoring container running to report on server health). Will not
 require any particular image if left off.
+
+This argument can be specified multiple times to check multiple images. All must
+be running for the check to return an OK status.
 
 `-(warn|crit)-(meta|data)-space`: the thresholds at which the named Nagios status codes
 should be emitted. These are percentages, so `-crit-data-space=95` would send
