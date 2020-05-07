@@ -1,0 +1,15 @@
+[[constraint]]
+  name = "github.com/fsouza/go-dockerclient"
+  version = "1.1.0"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/newrelic/go_nagios"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/shenwei356/util"
+
+[prune]
+  go-tests = true
+  unused-packages = true

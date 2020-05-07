@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	dockerlib "github.com/fsouza/go-dockerclient"
 	"github.com/newrelic/go_nagios"
 	"github.com/shenwei356/util/bytesize"
+	"os"
 	"strings"
 	"sync"
 )
@@ -38,8 +38,9 @@ type CheckDocker struct {
 	TLSCertPath          string
 	TLSKeyPath           string
 	TLSCAPath            string
+	Minimal              bool
 	dockerclient         *dockerlib.Client
-	dockerInfoData       *dockerlib.Env
+	dockerInfoData       *dockerlib.DockerInfo
 	dockerContainersData []dockerlib.APIContainers
 }
 
@@ -91,15 +92,7 @@ func (cd *CheckDocker) GetData() error {
 }
 
 func (cd *CheckDocker) getByteSizeDriverStatus(key string) (bytesize.ByteSize, error) {
-	var statusInArray [][]string
-
-	err := json.Unmarshal([]byte(cd.dockerInfoData.Get("DriverStatus")), &statusInArray)
-
-	if err != nil {
-		return -1, errors.New("Unable to extract DriverStatus info.")
-	}
-
-	for _, status := range statusInArray {
+	for _, status := range cd.dockerInfoData.DriverStatus {
 		if status[0] == key {
 			return bytesize.Parse([]byte(status[1]))
 		}
@@ -249,18 +242,21 @@ func main() {
 
 	var dockerEndpoint string
 
-	flag.StringVar(&dockerEndpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
-	flag.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
-	flag.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
-	flag.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
-	flag.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
-	flag.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
-	flag.StringVar(&cd.ContainerName, "container-name", "", "The name of a container that must be running on the Docker server")
-	flag.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
-	flag.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
-	flag.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
-
-	flag.Parse()
+	fs := flag.NewFlagSet("check_docker", flag.ContinueOnError)
+	fs.StringVar(&dockerEndpoint, "base-url", "http://localhost:2375", "The Base URL for the Docker server")
+	fs.Float64Var(&cd.WarnMetaSpace, "warn-meta-space", 100, "Warning threshold for Metadata Space")
+	fs.Float64Var(&cd.CritMetaSpace, "crit-meta-space", 100, "Critical threshold for Metadata Space")
+	fs.Float64Var(&cd.WarnDataSpace, "warn-data-space", 100, "Warning threshold for Data Space")
+	fs.Float64Var(&cd.CritDataSpace, "crit-data-space", 100, "Critical threshold for Data Space")
+	fs.StringVar(&cd.ImageId, "image-id", "", "An image ID that must be running on the Docker server")
+	fs.StringVar(&cd.ContainerName, "container-name", "", "The name of a container that must be running on the Docker server")
+	fs.StringVar(&cd.TLSCertPath, "tls-cert", "", "Path to TLS cert file.")
+	fs.StringVar(&cd.TLSKeyPath, "tls-key", "", "Path to TLS key file.")
+	fs.StringVar(&cd.TLSCAPath, "tls-ca", "", "Path to TLS CA file.")
+	fs.BoolVar(&cd.Minimal, "minimal", false, "Minimize output to status-only [\"OK\", \"WARNING\", \"CRITICAL\", \"UNKNOWN\"]")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		panic(fmt.Sprintf("Unable to parse args: %s", err))
+	}
 
 	err = cd.setupClient(dockerEndpoint)
 	if err != nil {
@@ -276,7 +272,7 @@ func main() {
 
 	statuses := make([]*nagios.NagiosStatus, 0)
 
-	driver := cd.dockerInfoData.Get("Driver")
+	driver := cd.dockerInfoData.Driver
 
 	// Unfortunately, Metadata Space and Data Space information is only available on devicemapper
 	if driver == "devicemapper" {
@@ -293,5 +289,8 @@ func main() {
 	}
 
 	baseStatus.Aggregate(statuses)
+	if cd.Minimal {
+		baseStatus.Message = ""
+	}
 	nagios.ExitWithStatus(baseStatus)
 }
