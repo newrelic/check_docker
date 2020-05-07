@@ -27,9 +27,9 @@ of your choice.
 Building
 --------
 ```
-go get github.com/newrelic/go_nagios
-go build
+go get github.com/newrelic/check_docker
 ```
+This will install check_docker into $GOCODE/bin.
 
 Usage
 -----
